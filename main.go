@@ -3,10 +3,13 @@ package main
 import (
 	"database/sql"
 	"embed"
+	"fmt"
 	"io"
 	"log"
+	"log/slog"
 	"net/http"
 	"os"
+	"time"
 
 	"github.com/go-chi/chi"
 	"github.com/go-chi/cors"
@@ -89,10 +92,26 @@ func main() {
 
 	router.Mount("/v1", v1Router)
 	srv := &http.Server{
-		Addr:    ":" + port,
-		Handler: router,
+		Addr:              ":" + port,
+		Handler:           router,
+		ReadHeaderTimeout: 15 * time.Second,
 	}
 
-	log.Printf("Serving on port: %s\n", port)
+	handler := slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{
+		Level:     slog.LevelDebug, // Controls minimum log level to output
+		AddSource: true,            // Adds file:line source info
+		ReplaceAttr: func(groups []string, a slog.Attr) slog.Attr {
+			// Optional: filter or modify attributes
+			if a.Key == "password" {
+				return slog.String("password", "***")
+			}
+			return a
+		},
+	})
+
+	// 2️⃣ Instantiate the logger
+	logger := slog.New(handler)
+	message := fmt.Sprintf("Serving on port: %s\n", port)
+	logger.Info(message)
 	log.Fatal(srv.ListenAndServe())
 }
